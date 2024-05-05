@@ -2,59 +2,63 @@
 
 # Git Repository Health Checker
 
-# Check if the script is run in a Git repository
-if ! git rev-parse --is-inside-work-tree &>/dev/null; then
-  echo "This script must be run inside a Git repository."
-  exit 1
-fi
+# Function to check if the script is run in a Git repository
+ensure_git_repo() {
+  if ! git rev-parse --is-inside-work-tree &>/dev/null; then
+    echo "Error: This script must be run inside a Git repository."
+    exit 1
+  fi
+}
 
-# Check large files in the repository
+# Function to check for large files in the repository
 check_large_files() {
-  local threshold_kb=500 # Threshold size in KB (adjust as needed)
+  local threshold_kb=500  # Adjust threshold size as needed
+
   echo "Checking for large files (>$threshold_kb KB)..."
-  
-  # Find files larger than the threshold size
-  git lfs ls-files --size | awk -v threshold=$((threshold_kb * 1024)) '$2 > threshold {print $1 ": " $2 " bytes"}'
-  
-  # If Git LFS is not being used, use alternative method
-  if [ $? -ne 0 ]; then
+
+  # Use git lfs to list large files if available
+  if command -v git-lfs &>/dev/null; then
+    git lfs ls-files --size | awk -v threshold=$((threshold_kb * 1024)) '$2 > threshold {print $1 ": " $2 " bytes"}'
+  else
+    # Alternative method using git ls-tree
     git ls-tree -r --long HEAD | awk -v threshold=$((threshold_kb * 1024)) '$4 > threshold {print $6 " (" $4 " bytes)"}'
   fi
 }
 
-# Check outdated dependencies
+# Function to check for outdated dependencies
 check_outdated_dependencies() {
   echo "Checking for outdated dependencies..."
-  
-  # Check if a package.json file exists
+
+  # Check for Node.js project
   if [ -f "package.json" ]; then
     echo "Node.js project detected. Checking for outdated dependencies..."
-    npm outdated
+    npm outdated || echo "Failed to check Node.js dependencies. Make sure npm is installed and properly configured."
   fi
-  
-  # Check if a requirements.txt file exists
+
+  # Check for Python project
   if [ -f "requirements.txt" ]; then
     echo "Python project detected. Checking for outdated dependencies..."
-    pip list --outdated
+    pip list --outdated || echo "Failed to check Python dependencies. Make sure pip is installed and properly configured."
   fi
 }
 
-# Check unoptimized images
+# Function to check for unoptimized images
 check_unoptimized_images() {
   echo "Checking for unoptimized images..."
-  
-  # Find image files that can be optimized
-  find . -type f \( -name "*.png" -o -name "*.jpg" \) -exec identify -format "%i: %Q\n" {} \; | awk '$2 > 80 {print $1}' # Adjust the quality threshold as needed
+
+  # Find image files (JPEG and PNG) and list those with quality below threshold
+  find . -type f \( -name "*.png" -o -name "*.jpg" \) -exec identify -format "%i: %Q\n" {} \; | awk '$2 < 80 {print $1}' # Adjust the quality threshold as needed
 }
 
 # Perform all checks
 perform_checks() {
+  ensure_git_repo
   check_large_files
   echo ""
-  
+
   check_outdated_dependencies
   echo ""
-  
+
   check_unoptimized_images
 }
 
