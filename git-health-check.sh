@@ -5,14 +5,14 @@
 # Function to check if the script is run in a Git repository
 ensure_git_repo() {
   if ! git rev-parse --is-inside-work-tree &>/dev/null; then
-    echo "Error: This script must be run inside a Git repository."
+    echo "Error: This script must be run inside a Git repository." >&2
     exit 1
   fi
 }
 
 # Function to check for large files in the repository
 check_large_files() {
-  local threshold_kb=500  # Adjust threshold size as needed
+  local threshold_kb=${THRESHOLD_KB:-500}  # Adjust threshold size as needed
 
   echo "Checking for large files (>$threshold_kb KB)..."
 
@@ -32,13 +32,21 @@ check_outdated_dependencies() {
   # Check for Node.js project
   if [ -f "package.json" ]; then
     echo "Node.js project detected. Checking for outdated dependencies..."
-    npm outdated || echo "Failed to check Node.js dependencies. Make sure npm is installed and properly configured."
+    if command -v npm &>/dev/null; then
+      npm outdated || echo "Failed to check Node.js dependencies. Make sure npm is installed and properly configured." >&2
+    else
+      echo "npm is not installed. Please install npm to check for outdated dependencies." >&2
+    fi
   fi
 
   # Check for Python project
   if [ -f "requirements.txt" ]; then
     echo "Python project detected. Checking for outdated dependencies..."
-    pip list --outdated || echo "Failed to check Python dependencies. Make sure pip is installed and properly configured."
+    if command -v pip &>/dev/null; then
+      pip list --outdated || echo "Failed to check Python dependencies. Make sure pip is installed and properly configured." >&2
+    else
+      echo "pip is not installed. Please install pip to check for outdated dependencies." >&2
+    fi
   fi
 }
 
